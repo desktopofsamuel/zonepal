@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { usePostHog } from 'posthog-js/react';
+import { useAuth } from '@/contexts/auth-context';
+import { useUserData } from '@/contexts/user-data-context';
 import { Button } from '@/components/ui/button';
 import { Calendar } from "@/components/ui/calendar";
 import { Squares2X2Icon, ListBulletIcon, CalendarIcon, ArrowsUpDownIcon, PencilIcon } from '@heroicons/react/24/outline';
@@ -18,6 +20,7 @@ import { TimeZoneInfo, findTimezoneByIana, getTimeInTimeZone } from '@/lib/timez
 import { TimelineSettings } from '@/lib/types';
 import { EmptyState } from '@/components/empty-state';
 import { AppFooter } from '@/components/app-footer';
+import { UserMenu } from '@/components/auth/user-menu';
 
 interface BlockedHours {
   [timezone: string]: number[];
@@ -26,10 +29,17 @@ interface BlockedHours {
 type ViewType = 'cards' | 'grid';
 
 export function Main() {
-  const [view, setView] = useState<ViewType>('cards');
   const posthog = usePostHog();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const { userData, updateSettings, updateView, updateRecent } = useUserData();
+  
+  // Initialize view from user data or default to cards
+  const [view, setView] = useState<ViewType>(() => {
+    return userData?.defaultView || 'cards';
+  });
+  
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -47,8 +57,14 @@ export function Main() {
       }));
   });
 
-  // Initialize timeline settings from URL
+  // Initialize timeline settings from user data or URL
   const [timelineSettings, setTimelineSettings] = useState<TimelineSettings>(() => {
+    // First check if user is logged in and has settings
+    if (user && userData?.timelineSettings) {
+      return userData.timelineSettings;
+    }
+    
+    // Fall back to URL parameters
     const blockedParam = searchParams.get('b');
     const blockedTimeSlots = blockedParam 
       ? blockedParam.split(',').map(block => {
@@ -84,6 +100,39 @@ export function Main() {
     return () => clearInterval(interval);
   }, [selectedDate]);
 
+  // Sync user data when userData changes
+  useEffect(() => {
+    if (userData) {
+      // Update view if different from user preference
+      if (userData.defaultView !== view) {
+        setView(userData.defaultView);
+      }
+      
+      // Update timeline settings if different from user data
+      if (JSON.stringify(userData.timelineSettings) !== JSON.stringify(timelineSettings)) {
+        setTimelineSettings(userData.timelineSettings);
+      }
+      
+      // Load recent timezones if no timezones are currently active and no URL params
+      const hasUrlTimezones = searchParams.get('z');
+      if (!hasUrlTimezones && timeZones.length === 0 && userData.recentTimezones.length > 0) {
+        // Load the most recent timezones (up to 3)
+        const recentToLoad = userData.recentTimezones.slice(0, 3);
+        const loadedTimezones = recentToLoad
+          .map(name => findTimezoneByIana(name))
+          .filter((tz): tz is TimeZoneInfo => tz !== undefined)
+          .map(tz => ({
+            ...tz,
+            ...getTimeInTimeZone(selectedDate, tz.ianaName)
+          }));
+        
+        if (loadedTimezones.length > 0) {
+          setTimeZones(loadedTimezones);
+        }
+      }
+    }
+  }, [userData, view, timelineSettings, timeZones.length, searchParams, selectedDate]);
+
   // Update URL when timezones or blocked hours change
   useEffect(() => {
     const zParam = timeZones.map(tz => tz.ianaName).join(',');
@@ -96,9 +145,99 @@ export function Main() {
       : `/?b=${bParam}`;
     
     router.push(url);
-  }, [timeZones.map(tz => tz.ianaName).join(','), // Only trigger on timezone list changes
-      timelineSettings.blockedTimeSlots.map(slot => `${slot.start}-${slot.end}`).join(','), // Only trigger on blocked hours changes
-      router]);
+  }, [timeZones, timelineSettings.blockedTimeSlots, router]);
+
+  // Get blocked hours for grid view
+  const blockedHours = useMemo(() => {
+    const blocks: BlockedHours = {};
+    
+    timeZones.forEach(tz => {
+      blocks[tz.ianaName] = [];
+      timelineSettings.blockedTimeSlots.forEach(slot => {
+        if (slot.start > slot.end) {
+          // Handle overnight blocks
+          for (let h = slot.start; h < 24; h++) blocks[tz.ianaName].push(h);
+          for (let h = 0; h <= slot.end; h++) blocks[tz.ianaName].push(h);
+        } else {
+          for (let h = slot.start; h <= slot.end; h++) blocks[tz.ianaName].push(h);
+        }
+      });
+    });
+
+    return blocks;
+  }, [timeZones, timelineSettings.blockedTimeSlots]);
+
+  // Track view changes
+  const handleViewChange = async (newView: ViewType) => {
+    setView(newView);
+    
+    // Save view preference to Firebase if user is logged in
+    if (user) {
+      try {
+        await updateView(newView);
+      } catch (error) {
+        console.error('Failed to save view preference:', error);
+      }
+    }
+    
+    trackEvent(posthog, EventCategory.UI, EventAction.CHANGE, {
+      view: newView,
+      source: 'view_toggle'
+    });
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+      // Update all timezone times when date changes
+      setTimeZones(prevZones => 
+        prevZones.map(tz => ({
+          ...tz,
+          ...getTimeInTimeZone(date, tz.ianaName)
+        }))
+      );
+      setIsCalendarOpen(false);
+    }
+  };
+
+  const handleTimeChange = (newDate: Date) => {
+    setSelectedDate(newDate);
+    // Update all timezone times when time changes
+    setTimeZones(prevZones => 
+      prevZones.map(tz => ({
+        ...tz,
+        ...getTimeInTimeZone(newDate, tz.ianaName)
+      }))
+    );
+  };
+
+  const handleToggleEditMode = useCallback(() => {
+    setIsEditMode(!isEditMode);
+    trackEvent(posthog, EventCategory.UI, EventAction.TOGGLE, {
+      action: isEditMode ? 'edit_mode_off' : 'edit_mode_on'
+    });
+  }, [isEditMode, posthog]);
+
+  const handleSort = useCallback(() => {
+    setTimeZones(prev => {
+      // First sort by UTC offset
+      const sortedZones = [...prev].sort((a, b) => a.utcOffset - b.utcOffset);
+      
+      // Then update times for all sorted zones
+      const updatedSortedZones = sortedZones.map(tz => ({
+        ...tz,
+        ...getTimeInTimeZone(selectedDate, tz.ianaName)
+      }));
+      
+      // Track timezone sorting
+      trackEvent(posthog, EventCategory.TIMEZONE, EventAction.SORT, {
+        count: updatedSortedZones.length,
+        view
+      });
+      
+      return updatedSortedZones;
+    });
+  }, [selectedDate, view, posthog]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -136,68 +275,7 @@ export function Main() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [view]); // Only re-add listener when view changes
-
-  // Get blocked hours for grid view
-  const blockedHours = useMemo(() => {
-    const blocks: BlockedHours = {};
-    
-    timeZones.forEach(tz => {
-      blocks[tz.ianaName] = [];
-      timelineSettings.blockedTimeSlots.forEach(slot => {
-        if (slot.start > slot.end) {
-          // Handle overnight blocks
-          for (let h = slot.start; h < 24; h++) blocks[tz.ianaName].push(h);
-          for (let h = 0; h <= slot.end; h++) blocks[tz.ianaName].push(h);
-        } else {
-          for (let h = slot.start; h <= slot.end; h++) blocks[tz.ianaName].push(h);
-        }
-      });
-    });
-
-    return blocks;
-  }, [timeZones, timelineSettings.blockedTimeSlots]);
-
-  // Track view changes
-  const handleViewChange = (newView: ViewType) => {
-    setView(newView);
-    trackEvent(posthog, EventCategory.UI, EventAction.CHANGE, {
-      view: newView,
-      source: 'view_toggle'
-    });
-  };
-
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      setSelectedDate(date);
-      // Update all timezone times when date changes
-      setTimeZones(prevZones => 
-        prevZones.map(tz => ({
-          ...tz,
-          ...getTimeInTimeZone(date, tz.ianaName)
-        }))
-      );
-      setIsCalendarOpen(false);
-    }
-  };
-
-  const handleTimeChange = (newDate: Date) => {
-    setSelectedDate(newDate);
-    // Update all timezone times when time changes
-    setTimeZones(prevZones => 
-      prevZones.map(tz => ({
-        ...tz,
-        ...getTimeInTimeZone(newDate, tz.ianaName)
-      }))
-    );
-  };
-
-  const handleToggleEditMode = () => {
-    setIsEditMode(!isEditMode);
-    trackEvent(posthog, EventCategory.UI, EventAction.TOGGLE, {
-      action: isEditMode ? 'edit_mode_off' : 'edit_mode_on'
-    });
-  };
+  }, [view, handleToggleEditMode, handleSort]);
 
   const handleAddTimeZone = (timezone: TimeZoneInfo) => {
     setTimeZones(prev => {
@@ -207,6 +285,14 @@ export function Main() {
         ...getTimeInTimeZone(selectedDate, timezone.ianaName)
       };
       const updatedZones = [...prev, updatedZone];
+      
+      // Update recent timezones in Firebase if user is logged in
+      if (user) {
+        const recentTimezones = [timezone.ianaName, ...updatedZones.slice(0, -1).map(tz => tz.ianaName)];
+        updateRecent(recentTimezones.slice(0, 10)).catch(error => {
+          console.error('Failed to update recent timezones:', error);
+        });
+      }
       
       // Track timezone added
       trackEvent(posthog, EventCategory.TIMEZONE, EventAction.ADD, {
@@ -234,29 +320,17 @@ export function Main() {
     });
   };
 
-  const handleSort = () => {
-    setTimeZones(prev => {
-      // First sort by UTC offset
-      const sortedZones = [...prev].sort((a, b) => a.utcOffset - b.utcOffset);
-      
-      // Then update times for all sorted zones
-      const updatedSortedZones = sortedZones.map(tz => ({
-        ...tz,
-        ...getTimeInTimeZone(selectedDate, tz.ianaName)
-      }));
-      
-      // Track timezone sorting
-      trackEvent(posthog, EventCategory.TIMEZONE, EventAction.SORT, {
-        count: updatedSortedZones.length,
-        view
-      });
-      
-      return updatedSortedZones;
-    });
-  };
-
-  const handleSettingsChange = (settings: TimelineSettings) => {
+  const handleSettingsChange = async (settings: TimelineSettings) => {
     setTimelineSettings(settings);
+    
+    // Save settings to Firebase if user is logged in
+    if (user) {
+      try {
+        await updateSettings(settings);
+      } catch (error) {
+        console.error('Failed to save timeline settings:', error);
+      }
+    }
     
     // Track settings change
     trackEvent(posthog, EventCategory.BLOCKED_HOURS, EventAction.UPDATE, {
@@ -274,7 +348,9 @@ export function Main() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">ZonePal</h1>
             <p className="text-sm text-gray-500 mt-1">Time zone converter for remote teams</p>
           </div>
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center gap-3">
+            <UserMenu />
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
             <Button
               variant={view === 'cards' ? 'default' : 'ghost'}
               size="sm"
@@ -299,6 +375,7 @@ export function Main() {
               <Squares2X2Icon className="h-4 w-4 mr-1" />
               Grid
             </Button>
+            </div>
           </div>
         </div>
 
@@ -309,6 +386,7 @@ export function Main() {
                 onSelect={handleAddTimeZone}
                 selectedTimezones={timeZones.map(tz => tz.ianaName)}
                 triggerRef={searchTriggerRef}
+                userRecentTimezones={userData?.recentTimezones}
               />
             </div>
             <div className="flex items-center gap-2 sm:gap-3">

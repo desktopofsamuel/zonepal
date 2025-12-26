@@ -9,8 +9,14 @@ export function cn(...inputs: ClassValue[]) {
 const RECENT_TIMEZONES_KEY = 'zonepal_recent_timezones';
 const MAX_RECENT_TIMEZONES = 5;
 
-// Get recent timezones from localStorage
-export function getRecentTimezones(): string[] {
+// Get recent timezones from localStorage (for guests) or from provided user data (for authenticated users)
+export function getRecentTimezones(userRecentTimezones?: string[]): string[] {
+  // If user is authenticated and has recent timezones, use those
+  if (userRecentTimezones && userRecentTimezones.length > 0) {
+    return userRecentTimezones;
+  }
+  
+  // Fall back to localStorage for guest users
   if (typeof window === 'undefined') return [];
   
   try {

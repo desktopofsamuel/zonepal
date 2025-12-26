@@ -4,6 +4,8 @@ import localFont from "next/font/local";
 import "./globals.css";
 import config from "../../config";
 import { PostHogProvider } from './providers'
+import { AuthProvider } from '@/contexts/auth-context';
+import { UserDataProvider } from '@/contexts/user-data-context';
 import { Footer } from "@/components/footer";
 
 const Funnel_Display = localFont({
@@ -61,12 +63,16 @@ export default function RootLayout({
         className={`${Funnel_Display.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <PostHogProvider>
-          <div className="min-h-screen flex flex-col">
-            <main className="flex-grow">
-              {children}
-            </main>
-            <Footer />
-          </div>
+          <AuthProvider>
+            <UserDataProvider>
+              <div className="min-h-screen flex flex-col">
+                <main className="flex-grow">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+            </UserDataProvider>
+          </AuthProvider>
         </PostHogProvider>
       </body>
       <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_MEASUREMENT_ID!} />

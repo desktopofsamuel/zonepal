@@ -25,6 +25,7 @@ interface TimezoneSearchProps {
   onSelect: (timezone: TimeZoneInfo) => void;
   selectedTimezones?: string[]; // Array of selected IANA timezone names
   triggerRef?: React.RefObject<HTMLButtonElement>;
+  userRecentTimezones?: string[]; // User's recent timezones from Firebase
 }
 
 interface GroupedTimezones {
@@ -94,7 +95,7 @@ const TimezoneGroup = React.memo(({
 
 TimezoneGroup.displayName = 'TimezoneGroup';
 
-export function TimezoneSearch({ onSelect, selectedTimezones = [], triggerRef }: TimezoneSearchProps) {
+export function TimezoneSearch({ onSelect, selectedTimezones = [], triggerRef, userRecentTimezones }: TimezoneSearchProps) {
   const [search, setSearch] = React.useState("");
   const [lastSelected, setLastSelected] = React.useState<string | null>(null);
   const [open, setOpen] = React.useState(false);
@@ -107,7 +108,7 @@ export function TimezoneSearch({ onSelect, selectedTimezones = [], triggerRef }:
   // Load recent timezones
   React.useEffect(() => {
     if (open) {
-      const recentIanaNames = getRecentTimezones();
+      const recentIanaNames = getRecentTimezones(userRecentTimezones);
       
       // Filter out already selected timezones
       const filteredRecentNames = recentIanaNames.filter(
@@ -121,7 +122,7 @@ export function TimezoneSearch({ onSelect, selectedTimezones = [], triggerRef }:
       
       setRecentTimezones(timezones);
     }
-  }, [open, selectedTimezones]);
+  }, [open, selectedTimezones, userRecentTimezones]);
 
   // Filter timezones based on search
   const filteredTimezones = React.useMemo(() => {
