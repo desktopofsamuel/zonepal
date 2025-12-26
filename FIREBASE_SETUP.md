@@ -8,14 +8,9 @@
 
 ### Authentication Setup
 1. Go to **Authentication** > **Sign-in method**
-2. Enable **Google** provider:
-   - Click on Google in the providers list
-   - Click "Enable"
-   - Add your domain (e.g., localhost:3000 for development, yourdomain.com for production) to the **Authorized domains** list
-   - The Web SDK configuration will be auto-filled
-   - Click "Save"
-3. Enable **Email/Password** provider (optional, for fallback authentication)
-4. Configure any additional providers if needed
+2. Enable **Email/Password** provider
+3. Configure any additional providers if needed
+
 
 ### Firestore Database Setup
 1. Go to **Firestore Database**
@@ -78,9 +73,8 @@ The app will automatically create the following collections:
 ## Features Implemented
 
 ✅ **User Authentication**
-- **Google Sign-In** (primary authentication method)
-- Email/password sign up and sign in (fallback option)
-- User profile management with Google profile integration
+- Email/password sign up and sign in
+- User profile management
 - Secure logout
 
 ✅ **Data Persistence**
@@ -102,12 +96,6 @@ The app will automatically create the following collections:
 
 **"Firebase not configured" error**: Make sure all environment variables are set correctly in `.env.local`
 
-**Google Sign-In popup blocked**: Modern browsers may block popups. Ensure your domain is added to Firebase authorized domains and test in different browsers.
-
-**"auth/unauthorized-domain" error**: Add your domain (localhost:3000, yourdomain.com) to the authorized domains list in Firebase Console > Authentication > Settings > Authorized domains
-
-**Authentication errors**: Check that Google provider is enabled in Firebase Console
+**Authentication errors**: Check that Email/Password provider is enabled in Firebase Console
 
 **Firestore permission errors**: Ensure Firestore is created and rules allow authenticated users to read/write their own data
-
-**Google Sign-In not working in production**: Make sure your production domain is added to Firebase authorized domains and any Google Cloud Console OAuth settings if applicable
