@@ -43,7 +43,7 @@ const TimezoneItem = React.memo(({
   isSelected: boolean;
 }) => (
   <CommandItem
-    value={`${timezone.label} ${(timezone.aliases || []).join(' ')} ${timezone.country}`}
+    value={`${timezone.label} ${timezone.ianaName} ${(timezone.aliases || []).join(' ')} ${timezone.country}`}
     onSelect={() => onSelect(timezone.ianaName)}
     disabled={isSelected}
     className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}

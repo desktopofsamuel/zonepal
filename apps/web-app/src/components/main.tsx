@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { TimezoneSearch } from '@/components/timezone-search';
 import { cn } from '@/lib/utils';
 import { SettingsDialog } from '@/components/settings-dialog';
-import { TimeZoneInfo, findTimezoneByIana, getTimeInTimeZone } from '@/lib/timezone';
+import { TimeZoneInfo, findTimezone, findTimezoneByIana, getTimeInTimeZone } from '@/lib/timezone';
 import { TimelineSettings } from '@/lib/types';
 import { EmptyState } from '@/components/empty-state';
 import { AppFooter } from '@/components/app-footer';
@@ -40,7 +40,7 @@ export function Main() {
   const [timeZones, setTimeZones] = useState<TimeZoneInfo[]>(() => {
     const ianaNames = searchParams.get('z')?.split(',') || [];
     return ianaNames
-      .map(name => findTimezoneByIana(name))
+      .map(name => findTimezone(name))
       .filter((tz): tz is TimeZoneInfo => tz !== undefined)
       .map(tz => ({
         ...tz,
