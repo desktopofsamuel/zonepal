@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { PlusIcon, CheckIcon } from "@heroicons/react/24/outline"
 import { TimeZoneInfo, timezoneDatabase } from "@/lib/timezone"
+import { searchTimezones } from "@/lib/timezone-search"
 import { getRecentTimezones } from "@/lib/utils"
 
 // Debug mode flag - set to true to show debug panel
@@ -42,7 +43,7 @@ const TimezoneItem = React.memo(({
   isSelected: boolean;
 }) => (
   <CommandItem
-    value={`${timezone.label} ${timezone.country}`}
+    value={`${timezone.label} ${(timezone.aliases || []).join(' ')} ${timezone.country}`}
     onSelect={() => onSelect(timezone.ianaName)}
     disabled={isSelected}
     className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
@@ -54,6 +55,11 @@ const TimezoneItem = React.memo(({
         )}
         <span className="flex flex-col">
           <span>{timezone.label}</span>
+          {timezone.aliases && timezone.aliases.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              Also: {timezone.aliases.join(', ')}
+            </span>
+          )}
           <span className="text-xs text-muted-foreground">
             {timezone.country} {timezone.countryCode ? `(${timezone.countryCode})` : ''}
           </span>
@@ -129,68 +135,15 @@ export function TimezoneSearch({ onSelect, selectedTimezones = [], triggerRef }:
       return availableTimezones;
     }
     
-    // Clean up search input but keep spaces for matching
-    const searchTerms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    if (searchTerms.length === 0) {
-      return availableTimezones;
-    }
-
-    // First try to find exact matches
-    const exactMatches = availableTimezones.filter(tz => {
-      const cityName = tz.label.toLowerCase();
-      return cityName === searchTerms.join(' ');
-    });
-
-    if (exactMatches.length > 0) {
-      // Log first 5 exact matches
-      if (DEBUG_MODE) {
-        console.log('Exact matches for:', search);
-        console.log(exactMatches.slice(0, 5).map(tz => `${tz.label}, ${tz.country} (${tz.ianaName})`));
-      }
-      return exactMatches;
-    }
-
-    // Then try to find partial matches where all terms are included
-    const partialMatches = availableTimezones.filter(tz => {
-      const searchableText = [
-        tz.label.toLowerCase(),
-        tz.country.toLowerCase(),
-        tz.countryCode.toLowerCase(),
-      ].join(' ');
-
-      return searchTerms.every(term => searchableText.includes(term));
-    });
-
-    if (partialMatches.length > 0) {
-      // Log first 5 partial matches
-      if (DEBUG_MODE) {
-        console.log('Partial matches for:', search);
-        console.log(partialMatches.slice(0, 5).map(tz => `${tz.label}, ${tz.country} (${tz.ianaName})`));
-      }
-      return partialMatches;
-    }
-
-    // Finally, try broader matches where any term matches
-    const broadMatches = availableTimezones.filter(tz => {
-      const searchableText = [
-        tz.label.toLowerCase(),
-        tz.region.toLowerCase(),
-        tz.country.toLowerCase(),
-        tz.countryCode.toLowerCase(),
-        tz.timezone.toLowerCase(),
-        tz.ianaName.toLowerCase()
-      ].join(' ');
-
-      return searchTerms.some(term => searchableText.includes(term));
-    });
+    const matches = searchTimezones(availableTimezones, search);
     
     // Log first 5 broad matches
     if (DEBUG_MODE) {
       console.log('Broad matches for:', search);
-      console.log(broadMatches.slice(0, 5).map(tz => `${tz.label}, ${tz.country} (${tz.ianaName})`));
+      console.log(matches.slice(0, 5).map(tz => `${tz.label}, ${tz.country} (${tz.ianaName})`));
     }
     
-    return broadMatches;
+    return matches;
   }, [availableTimezones, search]);
 
   // Get recent timezones for debug panel
@@ -351,4 +304,4 @@ export function TimezoneSearch({ onSelect, selectedTimezones = [], triggerRef }:
       )}
     </>
   )
-} 
+}

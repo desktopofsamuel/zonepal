@@ -16,7 +16,12 @@ export interface TimeZoneInfo {
   countryCode: string;
   utcOffset: number;
   dstOffset: number;
+  aliases: string[];
 }
+
+const timezoneCityAliases: Record<string, string[]> = {
+  'America/Los_Angeles': ['San Francisco'],
+};
 
 export function getTimeInTimeZone(date: Date, timeZone: string): { time: string; date: string } {
   const time = formatInTimeZone(date, timeZone, 'h:mm a')
@@ -51,7 +56,8 @@ export const timezoneDatabase = Intl.supportedValuesOf('timeZone').map(timezone 
     time: '',
     date: '',
     utcOffset: tzInfo?.utcOffset || 0,
-    dstOffset: tzInfo?.dstOffset || 0
+    dstOffset: tzInfo?.dstOffset || 0,
+    aliases: timezoneCityAliases[timezone] || []
   };
 });
 
@@ -89,4 +95,4 @@ export function getTimezonesForCountry(countryCode: string): TimeZoneInfo[] {
 export function getCountryForTimezone(timezoneName: string): { code: string; name: string } | null {
   const country = ct.getCountryForTimezone(timezoneName);
   return country ? { code: country.id, name: country.name } : null;
-} 
+}
