@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-import { TimeZoneInfo, timezoneDatabase } from "@/lib/timezone";
+import { TimeZoneInfo, timezoneDatabase, withDisplayLocation } from "@/lib/timezone";
 import { searchTimezones } from "@/lib/timezone-search";
 import { getRecentTimezones } from "@/lib/utils";
 
@@ -81,7 +81,7 @@ const TimezoneItem = React.memo(
     return (
       <CommandItem
         value={`${city} ${timezone.label} ${timezone.ianaName} ${timezone.country}`}
-        onSelect={() => onSelect(timezone.ianaName)}
+        onSelect={() => onSelect(cityResult.id)}
         disabled={isSelected}
         className={isSelected ? "cursor-not-allowed opacity-50" : ""}
       >
@@ -253,10 +253,17 @@ export function TimezoneSearch({
       if (!value || value === lastSelected) return;
 
       try {
+        const [ianaName, ...cityParts] = value.split(":");
         const selectedTimezone = timezoneDatabase.find(
-          (tz) => tz.ianaName === value,
+          (tz) => tz.ianaName === ianaName,
         );
         if (!selectedTimezone) return;
+
+        const selectedCity = cityParts.join(":") || selectedTimezone.label;
+        const displayedTimezone = withDisplayLocation(
+          selectedTimezone,
+          selectedCity,
+        );
 
         // Update state in a more controlled way
         setLastSelected(value);
@@ -264,7 +271,7 @@ export function TimezoneSearch({
         setOpen(false); // Close popover after selection
         // Use requestAnimationFrame to ensure state updates are processed before callback
         requestAnimationFrame(() => {
-          onSelect(selectedTimezone);
+          onSelect(displayedTimezone);
         });
       } catch (error) {
         // Silent error handling

@@ -17,6 +17,21 @@ export interface TimeZoneInfo {
   utcOffset: number;
   dstOffset: number;
   aliases: string[];
+  urlSlug?: string;
+}
+
+export function locationToSlug(location: string): string {
+  return normalizeLocationName(location).replace(/\s+/g, '-');
+}
+
+export function withDisplayLocation(timezone: TimeZoneInfo, location: string): TimeZoneInfo {
+  return {
+    ...timezone,
+    label: location,
+    location,
+    name: location,
+    urlSlug: locationToSlug(location),
+  };
 }
 
 const timezoneCityAliases: Record<string, string[]> = {
@@ -134,9 +149,17 @@ export function findTimezoneByLocation(location: string): TimeZoneInfo | undefin
 
   if (!normalizedLocation) return undefined;
 
-  return timezoneDatabase.find(timezone =>
-    getTimezoneNames(timezone).some(name => normalizeLocationName(name) === normalizedLocation)
-  );
+  for (const timezone of timezoneDatabase) {
+    const matchedName = getTimezoneNames(timezone).find(
+      name => normalizeLocationName(name) === normalizedLocation
+    );
+
+    if (matchedName) {
+      return withDisplayLocation(timezone, matchedName);
+    }
+  }
+
+  return undefined;
 }
 
 export function findTimezone(ianaNameOrLocation: string): TimeZoneInfo | undefined {

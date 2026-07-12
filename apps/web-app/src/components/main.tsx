@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { TimezoneSearch } from '@/components/timezone-search';
 import { cn } from '@/lib/utils';
 import { SettingsDialog } from '@/components/settings-dialog';
-import { TimeZoneInfo, findTimezone, findTimezoneByIana, getTimeInTimeZone } from '@/lib/timezone';
+import { TimeZoneInfo, findTimezone, findTimezoneByIana, getTimeInTimeZone, locationToSlug } from '@/lib/timezone';
 import { TimelineSettings } from '@/lib/types';
 import { EmptyState } from '@/components/empty-state';
 import { AppFooter } from '@/components/app-footer';
@@ -35,7 +35,7 @@ export function Main() {
   const [isEditMode, setIsEditMode] = useState(false);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const hasDetectedTimezone = useRef(false);
-  
+
   // Initialize timezones from URL
   const [timeZones, setTimeZones] = useState<TimeZoneInfo[]>(() => {
     const ianaNames = searchParams.get('z')?.split(',') || [];
@@ -59,16 +59,16 @@ export function Main() {
       try {
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const timezoneInfo = findTimezoneByIana(userTimezone);
-        
+
         if (timezoneInfo) {
           hasDetectedTimezone.current = true;
           const timezoneWithTime = {
             ...timezoneInfo,
             ...getTimeInTimeZone(new Date(), timezoneInfo.ianaName)
           };
-          
+
           setTimeZones([timezoneWithTime]);
-          
+
           // Track timezone auto-detection
           if (posthog) {
             trackEvent(posthog, EventCategory.TIMEZONE, EventAction.ADD, {
@@ -87,13 +87,13 @@ export function Main() {
   // Initialize timeline settings from URL
   const [timelineSettings, setTimelineSettings] = useState<TimelineSettings>(() => {
     const blockedParam = searchParams.get('b');
-    const blockedTimeSlots = blockedParam 
+    const blockedTimeSlots = blockedParam
       ? blockedParam.split(',').map(block => {
           const [start, end] = block.split('-').map(Number);
           return { start, end };
         })
       : [{ start: 22, end: 6 }];
-    
+
     return {
       blockedTimeSlots,
       defaultBlockedHours: blockedTimeSlots[0],
@@ -104,7 +104,7 @@ export function Main() {
   // Update times every minute and when selectedDate changes
   useEffect(() => {
     const updateTimes = () => {
-      setTimeZones(prevZones => 
+      setTimeZones(prevZones =>
         prevZones.map(tz => ({
           ...tz,
           ...getTimeInTimeZone(selectedDate, tz.ianaName)
@@ -121,34 +121,39 @@ export function Main() {
     return () => clearInterval(interval);
   }, [selectedDate]);
 
-  // Update URL when timezones or blocked hours change
-  useEffect(() => {
-    const zParam = timeZones.map(tz => tz.ianaName).join(',');
-    const bParam = timelineSettings.blockedTimeSlots
+  const timezoneUrlParam = useMemo(() => {
+    return timeZones
+      .map(tz => tz.urlSlug || locationToSlug(tz.name || tz.label) || tz.ianaName)
+      .join(',');
+  }, [timeZones]);
+
+  const blockedHoursUrlParam = useMemo(() => {
+    return timelineSettings.blockedTimeSlots
       .map(slot => `${slot.start}-${slot.end}`)
       .join(',');
-    
-    const url = zParam 
-      ? `/?z=${zParam}&b=${bParam}`
-      : `/?b=${bParam}`;
-    
+  }, [timelineSettings.blockedTimeSlots]);
+
+  // Update URL when timezones or blocked hours change
+  useEffect(() => {
+    const url = timezoneUrlParam
+      ? `/?z=${timezoneUrlParam}&b=${blockedHoursUrlParam}`
+      : `/?b=${blockedHoursUrlParam}`;
+
     router.push(url);
-  }, [timeZones.map(tz => tz.ianaName).join(','), // Only trigger on timezone list changes
-      timelineSettings.blockedTimeSlots.map(slot => `${slot.start}-${slot.end}`).join(','), // Only trigger on blocked hours changes
-      router]);
+  }, [timezoneUrlParam, blockedHoursUrlParam, router]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip if user is typing in an input field
       if (
-        e.target instanceof HTMLInputElement || 
+        e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
         e.target instanceof HTMLSelectElement
       ) {
         return;
       }
-      
+
       // Handle keyboard shortcuts
       if (e.key.toLowerCase() === 'e' && view === 'cards') {
         handleToggleEditMode();
@@ -165,10 +170,10 @@ export function Main() {
         }
       }
     };
-    
+
     // Add event listener
     document.addEventListener('keydown', handleKeyDown);
-    
+
     // Clean up
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -178,7 +183,7 @@ export function Main() {
   // Get blocked hours for grid view
   const blockedHours = useMemo(() => {
     const blocks: BlockedHours = {};
-    
+
     timeZones.forEach(tz => {
       blocks[tz.ianaName] = [];
       timelineSettings.blockedTimeSlots.forEach(slot => {
@@ -208,7 +213,7 @@ export function Main() {
     if (date) {
       setSelectedDate(date);
       // Update all timezone times when date changes
-      setTimeZones(prevZones => 
+      setTimeZones(prevZones =>
         prevZones.map(tz => ({
           ...tz,
           ...getTimeInTimeZone(date, tz.ianaName)
@@ -221,7 +226,7 @@ export function Main() {
   const handleTimeChange = (newDate: Date) => {
     setSelectedDate(newDate);
     // Update all timezone times when time changes
-    setTimeZones(prevZones => 
+    setTimeZones(prevZones =>
       prevZones.map(tz => ({
         ...tz,
         ...getTimeInTimeZone(newDate, tz.ianaName)
@@ -244,14 +249,14 @@ export function Main() {
         ...getTimeInTimeZone(selectedDate, timezone.ianaName)
       };
       const updatedZones = [...prev, updatedZone];
-      
+
       // Track timezone added
       trackEvent(posthog, EventCategory.TIMEZONE, EventAction.ADD, {
         timezone: timezone.ianaName,
         total_count: updatedZones.length,
         view
       });
-      
+
       return updatedZones;
     });
   };
@@ -259,14 +264,14 @@ export function Main() {
   const handleRemoveTimeZone = (ianaName: string) => {
     setTimeZones(prev => {
       const updatedZones = prev.filter(tz => tz.ianaName !== ianaName);
-      
+
       // Track timezone removed
       trackEvent(posthog, EventCategory.TIMEZONE, EventAction.REMOVE, {
         timezone: ianaName,
         total_count: updatedZones.length,
         view
       });
-      
+
       return updatedZones;
     });
   };
@@ -275,26 +280,26 @@ export function Main() {
     setTimeZones(prev => {
       // First sort by UTC offset
       const sortedZones = [...prev].sort((a, b) => a.utcOffset - b.utcOffset);
-      
+
       // Then update times for all sorted zones
       const updatedSortedZones = sortedZones.map(tz => ({
         ...tz,
         ...getTimeInTimeZone(selectedDate, tz.ianaName)
       }));
-      
+
       // Track timezone sorting
       trackEvent(posthog, EventCategory.TIMEZONE, EventAction.SORT, {
         count: updatedSortedZones.length,
         view
       });
-      
+
       return updatedSortedZones;
     });
   };
 
   const handleSettingsChange = (settings: TimelineSettings) => {
     setTimelineSettings(settings);
-    
+
     // Track settings change
     trackEvent(posthog, EventCategory.BLOCKED_HOURS, EventAction.UPDATE, {
       count: settings.blockedTimeSlots.length,
@@ -342,7 +347,7 @@ export function Main() {
         <div className="bg-gradient-to-r from-gray-50 to-white p-6 rounded-2xl border border-gray-100 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1 min-w-0">
-              <TimezoneSearch 
+              <TimezoneSearch
                 onSelect={handleAddTimeZone}
                 selectedTimezones={timeZones.map(tz => tz.ianaName)}
                 triggerRef={searchTriggerRef}
@@ -352,8 +357,8 @@ export function Main() {
               <div className="relative z-40">
               <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                 <PopoverTrigger asChild>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className={cn(
                       "transition-colors shrink-0",
                       "md:w-40",
@@ -365,9 +370,9 @@ export function Main() {
                     <span className="hidden md:inline">{format(selectedDate, 'MMM dd, yyyy')}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent 
-                  className="w-auto p-0" 
-                  align="end" 
+                <PopoverContent
+                  className="w-auto p-0"
+                  align="end"
                   sideOffset={4}
                   onOpenAutoFocus={(e) => {
                     if (window.innerWidth < 640) {
@@ -391,9 +396,9 @@ export function Main() {
               </Popover>
               </div>
               <div className="flex gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleSort}
                 title="Sort by timezone offset (S)"
                 className="shrink-0"
@@ -401,13 +406,13 @@ export function Main() {
                 <ArrowsUpDownIcon className="h-5 w-5" />
                 <span className="sr-only">Sort timezones</span>
               </Button>
-              <SettingsDialog 
+              <SettingsDialog
                 settings={timelineSettings}
                 onSettingsChange={handleSettingsChange}
                 timeZones={timeZones.map(tz => ({ name: tz.name, ianaName: tz.ianaName }))}
               />
               {view === 'cards' && (
-                <Button 
+                <Button
                   variant={isEditMode ? "default" : "ghost"}
                   size="icon"
                   onClick={handleToggleEditMode}
@@ -428,7 +433,7 @@ export function Main() {
           {timeZones.length === 0 ? (
             <EmptyState onAddTimezone={() => searchTriggerRef.current?.click()} />
           ) : view === 'cards' ? (
-          <TimelineView 
+          <TimelineView
             timeZones={timeZones}
             selectedDate={selectedDate}
             onTimeChange={handleTimeChange}
@@ -444,9 +449,9 @@ export function Main() {
           />
           )}
         </div>
-        
+
         <AppFooter />
       </div>
     </main>
   );
-} 
+}

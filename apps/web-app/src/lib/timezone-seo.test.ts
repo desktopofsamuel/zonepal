@@ -11,6 +11,13 @@ test('resolves major city aliases from URL slugs', () => {
 })
 
 test('resolves query timezone parameters from city aliases', () => {
-  assert.equal(findTimezone('San Francisco')?.ianaName, 'America/Los_Angeles')
-  assert.equal(findTimezone('Hong Kong')?.ianaName, 'Asia/Hong_Kong')
+  const sanFrancisco = findTimezone('San Francisco')
+  const hongKong = findTimezone('Hong Kong')
+
+  assert.equal(sanFrancisco?.ianaName, 'America/Los_Angeles')
+  assert.equal(sanFrancisco?.name, 'San Francisco')
+  assert.equal(sanFrancisco?.urlSlug, 'san-francisco')
+  assert.equal(hongKong?.ianaName, 'Asia/Hong_Kong')
+  assert.equal(hongKong?.name, 'Hong Kong')
+  assert.equal(hongKong?.urlSlug, 'hong-kong')
 })
