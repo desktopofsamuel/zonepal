@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ZonePal
+
+ZonePal is a timezone comparison web application built with Next.js 14, React 18, and TypeScript. It allows users to compare multiple timezones, manage blocked hours for scheduling, and includes weather information integration.
 
 ## Getting Started
 
-First, run the development server:
+This is a pnpm workspaces monorepo. The web app lives in `apps/web-app`.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start development server |
+| `pnpm build` | Build for production (includes sitemap generation) |
+| `pnpm start` | Start production server |
+| `pnpm lint` | Run ESLint |
+| `pnpm release` | Create release with conventional changelog |
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+zonepal/
+├── apps/
+│   └── web-app/          # Next.js web application
+├── docs/                 # Product documentation
+├── package.json          # Workspace root
+└── pnpm-workspace.yaml
+```
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Set the **Root Directory** to `apps/web-app` in your Vercel project settings.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Required environment variables:
+
+- `NEXT_PUBLIC_POSTHOG_KEY`
+- `NEXT_PUBLIC_POSTHOG_HOST`
+- `NEXT_PUBLIC_MEASUREMENT_ID`
+- `WEATHER_API_KEY`
+
+See [CLAUDE.md](CLAUDE.md) for detailed architecture and development guidelines.

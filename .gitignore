@@ -5,6 +5,7 @@
 /.pnp
 .pnp.js
 .yarn/install-state.gz
+apps/*/node_modules
 
 # testing
 /coverage
@@ -12,6 +13,7 @@
 # next.js
 /.next/
 /out/
+apps/*/.next/
 
 # production
 /build
@@ -35,8 +37,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# astro
-.astro
-.cursor/mcp.json
+# secrets
+serviceAccountKey.json
+*-service-account*.json
 
-public
+# generated sitemap files
+apps/web-app/public/sitemap*.xml
+apps/web-app/public/robots.txt
+
+.cursor/mcp.json

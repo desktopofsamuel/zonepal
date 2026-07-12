@@ -6,14 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ZonePal is a timezone comparison web application built with Next.js 14, React 18, and TypeScript. It allows users to compare multiple timezones, manage blocked hours for scheduling, and includes weather information integration.
 
+This is a **pnpm workspaces monorepo**. The web app is at `apps/web-app`.
+
 ## Development Commands
 
-- `npm run dev` / `yarn dev` - Start development server on localhost:3000
-- `npm run build` / `yarn build` - Build for production (includes sitemap generation)
-- `npm run start` / `yarn start` - Start production server
-- `npm run lint` / `yarn lint` - Run ESLint
-- `npm run release` / `yarn release` - Create release with conventional changelog
-- `npm run postbuild` / `yarn postbuild` - Generate sitemap (runs automatically after build)
+Run from the repo root:
+
+- `pnpm dev` - Start development server on localhost:3000
+- `pnpm build` - Build for production (includes sitemap generation via postbuild)
+- `pnpm start` - Start production server
+- `pnpm lint` - Run ESLint
+- `pnpm release` - Create release with conventional changelog
 
 ## Technology Stack
 
@@ -21,6 +24,7 @@ ZonePal is a timezone comparison web application built with Next.js 14, React 18
 - Next.js 14.2.11 (App Router)
 - React 18 with TypeScript
 - TailwindCSS 4.0.0-beta.4 (custom PostCSS config)
+- pnpm workspaces
 
 **Key Libraries:**
 - `date-fns` & `date-fns-tz` for timezone handling
@@ -46,20 +50,27 @@ ZonePal is a timezone comparison web application built with Next.js 14, React 18
 ## Directory Structure
 
 ```
-src/
-├── app/                    # Next.js App Router
-│   ├── [timezone1]/[timezone2]/  # Dynamic timezone comparison routes (SEO)
-│   ├── api/weather/        # Weather API endpoint
-│   ├── changelog/          # Changelog page
-│   └── saved/              # Saved timezones functionality
-├── components/             # React components
-│   ├── ui/                 # Shadcn/ui base components
-│   └── common/             # Shared utility components
-└── lib/                    # Utilities and types
-    ├── timezone.ts         # Core timezone logic
-    ├── timezone-seo.ts     # SEO utilities for timezone URLs
-    ├── analytics.ts        # PostHog event tracking
-    └── types.ts            # TypeScript definitions
+zonepal/
+├── apps/
+│   └── web-app/                    # Next.js web application
+│       ├── src/
+│       │   ├── app/                # Next.js App Router
+│       │   │   ├── [timezone1]/[timezone2]/  # SEO dynamic routes
+│       │   │   ├── api/weather/    # Weather API endpoint
+│       │   │   └── changelog/      # Changelog page
+│       │   ├── components/         # React components
+│       │   │   └── ui/             # Shadcn/ui base components
+│       │   └── lib/                # Utilities and types
+│       │       ├── timezone.ts     # Core timezone logic
+│       │       ├── timezone-seo.ts # SEO utilities for timezone URLs
+│       │       ├── analytics.ts    # PostHog event tracking
+│       │       └── types.ts        # TypeScript definitions
+│       ├── public/
+│       ├── config.js               # Site metadata
+│       └── package.json
+├── docs/                           # Product documentation
+├── package.json                    # Workspace root
+└── pnpm-workspace.yaml
 ```
 
 ## Key Features & Implementation
@@ -93,9 +104,10 @@ src/
 
 **Core Components:**
 - `TimezoneCard` - Individual timezone display with weather
-- `Timeline` - Visual time selection interface
-- `SearchCommand` - Timezone search with keyboard shortcuts
-- `SettingsSheet` - Configuration panel
+- `TimelineRadix` - Visual time selection interface
+- `TimezoneSearch` - Timezone search with keyboard shortcuts
+- `SettingsDialog` - Configuration panel
+- `Main` - Root app component orchestrating views
 
 **UI Components:**
 - Based on Shadcn/ui with Radix UI primitives
@@ -106,7 +118,7 @@ src/
 
 **TypeScript:**
 - Strict type checking enabled
-- Comprehensive type definitions in `src/lib/types.ts`
+- Comprehensive type definitions in `apps/web-app/src/lib/types.ts`
 - Use proper typing for all props and state
 
 **Styling:**

@@ -19,8 +19,7 @@ interface ChangelogEntry {
 
 async function getChangelog(): Promise<ChangelogEntry[]> {
   try {
-    // Read the CHANGELOG.md file from the public directory
-    const filePath = path.join(process.cwd(), 'public', 'CHANGELOG.md');
+    const filePath = path.join(process.cwd(), '../../CHANGELOG.md');
     const fileContent = await fs.readFile(filePath, 'utf8');
     return parseChangelog(fileContent);
   } catch (error) {
