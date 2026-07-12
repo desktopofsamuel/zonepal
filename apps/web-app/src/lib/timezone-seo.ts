@@ -1,4 +1,4 @@
-import { timezoneDatabase } from './timezone';
+import { findTimezoneByLocation, timezoneDatabase } from './timezone';
 
 // Get major timezones that are commonly used for SEO
 export function getMajorTimezones(): string[] {
@@ -45,7 +45,7 @@ export function getMajorTimezones(): string[] {
   ];
 
   // Filter to only include timezones that exist in our database
-  return majorTimezones.filter(tz => 
+  return majorTimezones.filter(tz =>
     timezoneDatabase.some(dbTz => dbTz.ianaName === tz)
   );
 }
@@ -54,14 +54,14 @@ export function getMajorTimezones(): string[] {
 export function generateTimezonePairs(): Array<[string, string]> {
   const majorTimezones = getMajorTimezones();
   const pairs: Array<[string, string]> = [];
-  
+
   // Generate all unique combinations (not permutations)
   for (let i = 0; i < majorTimezones.length; i++) {
     for (let j = i + 1; j < majorTimezones.length; j++) {
       pairs.push([majorTimezones[i], majorTimezones[j]]);
     }
   }
-  
+
   return pairs;
 }
 
@@ -76,17 +76,22 @@ export function slugToTimezone(slug: string): string {
   if (timezoneDatabase.some(tz => tz.ianaName === slug)) {
     return slug;
   }
-  
+
+  const aliasedTimezone = findTimezoneByLocation(slug);
+  if (aliasedTimezone) {
+    return aliasedTimezone.ianaName;
+  }
+
   // Try to find a match by converting the slug
   const normalizedSlug = slug.toLowerCase();
-  
+
   // Check all possible timezone formats
   for (const tz of timezoneDatabase) {
     if (timezoneToSlug(tz.ianaName) === normalizedSlug) {
       return tz.ianaName;
     }
   }
-  
+
   // If no match found, try to reconstruct the timezone
   // Most timezone IDs follow the pattern Region/City
   const parts = slug.split('-');
@@ -97,21 +102,21 @@ export function slugToTimezone(slug: string): string {
       `${parts[0]}/${parts.slice(1).join('-')}`, // america-new-york -> America/New-York
       `${parts[0]}/${parts[1]}`, // Simple two-part
     ];
-    
+
     for (const possible of possibleTimezones) {
       const capitalized = possible
         .split('/')
-        .map(part => part.split(/[-_]/).map(word => 
+        .map(part => part.split(/[-_]/).map(word =>
           word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
         ).join('_'))
         .join('/');
-      
+
       if (timezoneDatabase.some(tz => tz.ianaName === capitalized)) {
         return capitalized;
       }
     }
   }
-  
+
   // Default to the original slug if no match found
   return slug;
 }
@@ -120,14 +125,14 @@ export function slugToTimezone(slug: string): string {
 export function getTimezoneComparisonTitle(tz1: string, tz2: string): string {
   const tz1Info = timezoneDatabase.find(tz => tz.ianaName === tz1);
   const tz2Info = timezoneDatabase.find(tz => tz.ianaName === tz2);
-  
+
   if (!tz1Info || !tz2Info) {
     return 'Timezone Comparison - ZonePal';
   }
-  
+
   const tz1Name = tz1Info.label;
   const tz2Name = tz2Info.label;
-  
+
   return `${tz1Name} to ${tz2Name} Time Converter - ZonePal`;
 }
 
@@ -135,16 +140,16 @@ export function getTimezoneComparisonTitle(tz1: string, tz2: string): string {
 export function getTimezoneComparisonDescription(tz1: string, tz2: string): string {
   const tz1Info = timezoneDatabase.find(tz => tz.ianaName === tz1);
   const tz2Info = timezoneDatabase.find(tz => tz.ianaName === tz2);
-  
+
   if (!tz1Info || !tz2Info) {
     return 'Compare timezones and schedule meetings across different time zones with ZonePal.';
   }
-  
+
   const tz1Name = tz1Info.label;
   const tz2Name = tz2Info.label;
   const tz1Country = tz1Info.country;
   const tz2Country = tz2Info.country;
-  
+
   return `Convert time between ${tz1Name} (${tz1Country}) and ${tz2Name} (${tz2Country}). Find the best meeting times and manage schedules across timezones with our visual timezone converter.`;
 }
 
@@ -152,10 +157,10 @@ export function getTimezoneComparisonDescription(tz1: string, tz2: string): stri
 export function getCanonicalUrl(tz1: string, tz2: string): string {
   const slug1 = timezoneToSlug(tz1);
   const slug2 = timezoneToSlug(tz2);
-  
+
   // Always put them in alphabetical order for canonical URL
   const [first, second] = [slug1, slug2].sort();
-  
+
   return `https://zonepal.com/${first}/${second}`;
 }
 
@@ -163,7 +168,7 @@ export function getCanonicalUrl(tz1: string, tz2: string): string {
 export function getStructuredData(tz1: string, tz2: string) {
   const description = getTimezoneComparisonDescription(tz1, tz2);
   const url = getCanonicalUrl(tz1, tz2);
-  
+
   return {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
